@@ -1,0 +1,60 @@
+{
+    "widgets": [
+        {
+            "type": "text",
+            "x": 0,
+            "y": 0,
+            "width": 24,
+            "height": 6,
+            "properties": {
+                "markdown": "# Main Data Pipeline Dashboard\n\nThis dashboard provides a centralized view of key metrics for the AWS Data Pipeline project.\n\n## How to Customize This Dashboard:\n\n*   **Understand the Structure**: Dashboards are composed of a series of `widgets`, each with its `type` (e.g., `text` or `metric`), `x`, `y`, `width`, `height` (position and size), and `properties`.\n*   **Modify Existing Widgets**:\n    *   **Metric Widgets (`type: \"metric\"`)**:\n        *   `metrics`: This is the core part that defines which metrics to display. Each metric is an array.\n            *   `[\"Namespace\", \"MetricName\", \"DimensionName1\", \"DimensionValue1\", ..., { \"label\": \"Display Name\", \"yAxis\": \"left/\"right\" }]`\n            *   **`Namespace`**: The namespace of the AWS service (e.g., `AWS/Lambda`, `AWS/Glue`, `AWS/S3`, `AWS/DMS`, `AWS/Redshift`, `AWS/SageMaker`, `AWS/StepFunctions`).\n            *   **`MetricName`**: The name of the metric to monitor (e.g., `Invocations`, `Errors`, `Failed`, `CPUUtilization`, `ExecutionsFailed`).\n            *   **`DimensionName`/`DimensionValue`**: Dimensions used to filter metrics (e.g., `FunctionName`, `JobName`, `BucketName`, `StateMachineArn`, `EndpointName`). Please ensure to replace examples like `your-lambda-function-name` with your actual resource names.\n            *   `label`: The name displayed on the chart.\n            *   `yAxis`: Choose whether the metric is displayed on the left or right axis.\n        *   `period`: The aggregation interval for data points (in seconds). E.g., `300` (5 minutes), `3600` (1 hour).\n        *   `stat`: The aggregation statistic method (e.g., `Sum`, `Average`, `Maximum`, `Minimum`).\n        *   `region`: The AWS region displayed on the dashboard. Please ensure it matches your deployment region.\n        *   `title`: The title of the widget.\n    *   **Text Widgets (`type: \"text\"`)**:\n        *   `markdown`: Supports Markdown syntax, useful for adding titles, descriptions, links, etc.\n*   **Add New Widgets**: You can copy the structure of existing widgets and modify their `x`, `y`, `width`, `height`, and `properties` to add new metrics or text blocks.\n*   **Update Re-run Links**: The URLs in the `Re-run Links` widget need to be manually updated to the correct links for your AWS account and region. You can navigate to the respective service page in the AWS console and copy the URL.\n\n**Important Note**: After each modification to this JSON file, you need to redeploy the dashboard via Terraform for the changes to take effect."            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 6,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "AWS/Lambda", "Invocations", "FunctionName", "csv-processor", { "label": "CSV Processor Invocations" } ],
+                    [ ".", "Errors", ".", ".", { "label": "CSV Processor Errors", "yAxis": "right" } ],
+                    [ ".", "Invocations", "FunctionName", "data-quality-checker", { "label": "Data Quality Invocations" } ],
+                    [ ".", "Errors", ".", ".", { "label": "Data Quality Errors", "yAxis": "right" } ]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "us-east-1",
+                "title": "Lambda Functions"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 12,
+            "y": 6,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "AWS/Glue", "glue.driver.aggregate.runningJobs", "JobName", "csv-to-redshift", { "label": "CSV to Redshift Running" } ],
+                    [ ".", "glue.driver.aggregate.succeededJobs", ".", ".", { "label": "Succeeded" } ],
+                    [ ".", "glue.driver.aggregate.failedJobs", ".", ".", { "label": "Failed" } ]
+                ],
+                "period": 3600,
+                "stat": "Sum",
+                "region": "us-east-1",
+                "title": "Glue Jobs"
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 12,
+            "width": 24,
+            "height": 2,
+            "properties": {
+                "markdown": "### Re-run Links\n\nThe following links can help you quickly navigate to the relevant service consoles to re-execute tasks. Please ensure to update these links with the correct URLs for your actual AWS account and region.\n\n*   **[Re-run CSV-to-Redshift Glue Job](https://console.aws.amazon.com/glue/home?region=us-east-1#job-details:jobName=csv-to-redshift)**\n*   **[Re-run Oracle-to-Redshift Glue Job](https://console.aws.amazon.com/glue/home?region=us-east-1#job-details:jobName=oracle-to-redshift)**\n*   **[Re-run Salesforce Sync Step Function](https://console.aws.amazon.com/states/home?region=us-east-1#/executions/statemachine/salesforce-sync-pipeline)**\n"
+            }
+        }
+    ]
+}

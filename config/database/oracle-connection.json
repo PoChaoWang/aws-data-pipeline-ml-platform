@@ -1,0 +1,22 @@
+{
+  "source_schema": "CRM_PROD",
+  "table_list": [
+    "CUSTOMERS",
+    "ORDERS",
+    "PRODUCTS",
+    "ORDER_ITEMS"
+  ],
+  "dms_task_settings": {
+    "TargetMetadata": {
+      "TargetSchema": "dms_stage",
+      "SupportLobs": true,
+      "FullLobMode": false,
+      "LobChunkSize": 64,
+      "LimitedSizeLobMode": true,
+      "LobMaxSize": 32
+    },
+    "Logging": {
+      "EnableLogging": true
+    }
+  }
+}

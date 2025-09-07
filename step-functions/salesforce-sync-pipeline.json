@@ -1,0 +1,41 @@
+{
+  "Comment": "A Step Function to orchestrate the SageMaker to Salesforce sync process.",
+  "StartAt": "StartSageMakerBatchTransform",
+  "States": {
+    "StartSageMakerBatchTransform": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:createTransformJob.sync",
+      "Parameters": {
+        "ModelName": "${SageMakerModelName}",
+        "TransformInput": {
+          "DataSource": {
+            "S3DataSource": {
+              "S3DataType": "S3Prefix",
+              "S3Uri": "${InputS3Uri}"
+            }
+          },
+          "ContentType": "text/csv"
+        },
+        "TransformOutput": {
+          "S3OutputPath": "${OutputS3Uri}"
+        },
+        "TransformResources": {
+          "InstanceCount": 1,
+          "InstanceType": "ml.m4.xlarge"
+        }
+      },
+      "Next": "ProcessAndSyncToSalesforce"
+    },
+    "ProcessAndSyncToSalesforce": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${SalesforceLambdaArn}",
+        "Payload": {
+          "s3_output_path.$": "$.TransformOutput.S3OutputPath"
+        }
+      },
+      "End": true
+    }
+  }
+}

@@ -1,0 +1,108 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9' # Or your desired Python version
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 # Replace with your desired AWS region
+
+      - name: Push Secrets to AWS Secrets Manager
+        run: |
+          # Oracle Secret
+          ORACLE_SECRET_JSON=$(jq -n \
+            --arg host "${{ secrets.ORACLE_DB_HOST }}" \
+            --arg port "${{ secrets.ORACLE_DB_PORT }}" \
+            --arg service_name "${{ secrets.ORACLE_DB_SERVICE_NAME }}" \
+            --arg user "${{ secrets.ORACLE_DB_USER }}" \
+            --arg password "${{ secrets.ORACLE_DB_PASSWORD }}" \
+            '{host: $host, port: ($port | tonumber), service_name: $service_name, user: $user, password: $password}')
+
+          aws secretsmanager update-secret --secret-id "${{ github.event.repository.name }}/${{ github.ref_name }}/oracle/credentials" --secret-string "$ORACLE_SECRET_JSON" || \
+          aws secretsmanager create-secret --name "${{ github.event.repository.name }}/${{ github.ref_name }}/oracle/credentials" --secret-string "$ORACLE_SECRET_JSON"
+
+          # Salesforce Secret
+          SALESFORCE_SECRET_JSON=$(jq -n \
+            --arg client_id "${{ secrets.SALESFORCE_CLIENT_ID }}" \
+            --arg client_secret "${{ secrets.SALESFORCE_CLIENT_SECRET }}" \
+            --arg username "${{ secrets.SALESFORCE_USERNAME }}" \
+            --arg password "${{ secrets.SALESFORCE_PASSWORD }}" \
+            --arg security_token "${{ secrets.SALESFORCE_SECURITY_TOKEN }}" \
+            '{client_id: $client_id, client_secret: $client_secret, username: $username, password: $password, security_token: $security_token}')
+
+          aws secretsmanager update-secret --secret-id "${{ github.event.repository.name }}/${{ github.ref_name }}/salesforce/credentials" --secret-string "$SALESFORCE_SECRET_JSON" || \
+          aws secretsmanager create-secret --name "${{ github.event.repository.name }}/${{ github.ref_name }}/salesforce/credentials" --secret-string "$SALESFORCE_SECRET_JSON"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1 # Ensure this matches your AWS region
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.x.x # Specify your Terraform version
+
+      - name: Build and Upload Lambda Packages
+        run: |
+          # Example for csv-processor lambda
+          cd lambda/csv-processor
+          pip install -r requirements.txt -t package
+          zip -r ../../lambda_csv_processor.zip .
+          aws s3 cp ../../lambda_csv_processor.zip s3://your-lambda-code-bucket/lambda_csv_processor.zip # Replace with your S3 bucket
+          cd ../..
+
+          # Example for data-quality-checker lambda
+          cd lambda/data-quality-checker
+          pip install -r requirements.txt -t package
+          zip -r ../../lambda_data_quality_checker.zip .
+          aws s3 cp ../../lambda_data_quality_checker.zip s3://your-lambda-code-bucket/lambda_data_quality_checker.zip # Replace with your S3 bucket
+          cd ../..
+
+          # Example for salesforce-integration lambda
+          cd lambda/salesforce-integration
+          pip install -r requirements.txt -t package
+          zip -r ../../lambda_salesforce_integration.zip .
+          aws s3 cp ../../lambda_salesforce_integration.zip s3://your-lambda-code-bucket/lambda_salesforce_integration.zip # Replace with your S3 bucket
+          cd ../..
+
+          # Example for orchestration lambda
+          cd lambda/orchestration
+          pip install -r requirements.txt -t package
+          zip -r ../../lambda_orchestration.zip .
+          aws s3 cp ../../lambda_orchestration.zip s3://your-lambda-code-bucket/lambda_orchestration.zip # Replace with your S3 bucket
+          cd ../..
+        # Ensure you have an S3 bucket for Lambda code, and update your Terraform to reference these S3 paths.
+
+      - name: Upload Glue Job Scripts to S3
+        run: |
+          aws s3 cp glue/jobs/csv-to-redshift.py s3://your-glue-scripts-bucket/csv-to-redshift.py # Replace with your S3 bucket
+          aws s3 cp glue/jobs/oracle-to-redshift.py s3://your-glue-scripts-bucket/oracle-to-redshift.py
+          aws s3 cp glue/jobs/data-quality-check.py s3://your-glue-scripts-bucket/data-quality-check.py
+          aws s3 cp glue/jobs/ml-data-prep.py s3://your-glue-scripts-bucket/ml-data-prep.py
+        # Ensure you have an S3 bucket for Glue scripts, and update your Terraform to reference these S3 paths.
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./terraform
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -var-file="environments/dev.tfvars" # Adjust environment as needed
+        working-directory: ./terraform

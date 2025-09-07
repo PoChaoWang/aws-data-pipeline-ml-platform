@@ -1,0 +1,5 @@
+docs/
+tests/
+doc.md
+terraform.tfvars
+.pytest_cache

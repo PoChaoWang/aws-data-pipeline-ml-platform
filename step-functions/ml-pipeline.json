@@ -1,0 +1,110 @@
+{
+  "Comment": "A Step Function to orchestrate the ML pipeline: Glue ETL -> SageMaker Training -> SageMaker Batch Inference",
+  "StartAt": "PrepareDataForML",
+  "States": {
+    "PrepareDataForML": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "${GlueJobName}",
+        "Arguments": {
+          "--REDSHIFT_CONNECTION_NAME": "${RedshiftConnectionName}",
+          "--TEMP_S3_DIR": "s3://${DataBucketName}/temp/",
+          "--OUTPUT_S3_PATH": "s3://${DataBucketName}/sagemaker/input/training-data/"
+        }
+      },
+      "Next": "TrainUserModel",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "ETLFailed"
+        }
+      ]
+    },
+    "TrainUserModel": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:createTrainingJob.sync",
+      "Parameters": {
+        "TrainingJobName.$": "States.Format('user-segmentation-training-{}', $$.Execution.Name)",
+        "RoleArn": "${SageMakerRoleArn}",
+        "AlgorithmSpecification": {
+          "TrainingImage": "${TrainingImageURI}",
+          "TrainingInputMode": "File"
+        },
+        "InputDataConfig": [
+          {
+            "ChannelName": "training",
+            "DataSource": {
+              "S3DataSource": {
+                "S3DataType": "S3Prefix",
+                "S3Uri": "s3://${DataBucketName}/sagemaker/input/training-data/"
+              }
+            },
+            "ContentType": "application/x-parquet"
+          }
+        ],
+        "OutputDataConfig": {
+          "S3OutputPath": "s3://${DataBucketName}/sagemaker/models/"
+        },
+        "ResourceConfig": {
+          "InstanceCount": 1,
+          "InstanceType": "ml.m5.large",
+          "VolumeSizeInGB": 30
+        },
+        "StoppingCondition": {
+          "MaxRuntimeInSeconds": 3600
+        }
+      },
+      "Next": "BatchInference",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "TrainingFailed"
+        }
+      ]
+    },
+    "BatchInference": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:createTransformJob.sync",
+      "Parameters": {
+        "TransformJobName.$": "States.Format('user-segmentation-inference-{}', $$.Execution.Name)",
+        "ModelName.$": "$.ModelArtifacts.S3ModelArtifacts",
+        "TransformInput": {
+          "DataSource": {
+            "S3DataSource": {
+              "S3DataType": "S3Prefix",
+              "S3Uri": "s3://${DataBucketName}/sagemaker/input/inference-data/"
+            }
+          },
+          "ContentType": "application/x-parquet"
+        },
+        "TransformOutput": {
+          "S3OutputPath": "s3://${DataBucketName}/sagemaker/output/inference-results/"
+        },
+        "TransformResources": {
+          "InstanceCount": 1,
+          "InstanceType": "ml.m5.large"
+        }
+      },
+      "End": true,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "InferenceFailed"
+        }
+      ]
+    },
+    "ETLFailed": {
+      "Type": "Fail",
+      "Cause": "Glue ETL job failed."
+    },
+    "TrainingFailed": {
+      "Type": "Fail",
+      "Cause": "SageMaker training job failed."
+    },
+    "InferenceFailed": {
+      "Type": "Fail",
+      "Cause": "SageMaker batch inference job failed."
+    }
+  }
+}
