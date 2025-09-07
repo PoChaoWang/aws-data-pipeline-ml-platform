@@ -1,10 +1,11 @@
 name: CI/CD Pipeline
 
-on:
-  push:
-    branches:
-      - main
-      - develop
+# To re-enable this workflow, remove the comments from the following lines.
+# on:
+#   push:
+#     branches:
+#       - main
+#       - develop
 
 jobs:
   deploy:

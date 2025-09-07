@@ -1,11 +1,12 @@
 
 name: Terraform Plan
 
-on:
-  pull_request:
-    branches:
-      - main
-      - develop
+# To re-enable this workflow, remove the comments from the following lines.
+# on:
+#   pull_request:
+#     branches:
+#       - main
+#       - develop
 
 jobs:
   terraform-plan:
